@@ -2,13 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "IntellMeet Backend API is live",
-    healthCheck: "/api/health",
-  });
-});
+
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -23,6 +17,14 @@ const errorMiddleware = require("./middleware/errorMiddleware");
 
 const app = express();
 app.set("trust proxy", 1);
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "IntellMeet Backend API is live",
+    healthCheck: "/api/health",
+  });
+});
 
 app.use(helmet());
 app.use(
