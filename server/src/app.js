@@ -31,7 +31,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://project-intell-meet.vercel.app/"
+      "https://project-intell-meet.vercel.app"
     ],
     credentials: true,
   })

@@ -1,21 +1,28 @@
 import { useNavigate } from "react-router-dom";
 import useMeetingStore from "../store/meetingStore";
+import { useState } from "react";
 
 function MeetingLobby() {
   const navigate = useNavigate();
+  const { setMeetingTitle } = useMeetingStore();
 
-  const {
-    meetingTitle,
-    setMeetingTitle,
-  } = useMeetingStore();
+  const [meetingId, setMeetingId] = useState("");
 
   const joinMeeting = () => {
-    navigate("/meeting-room");
+    if (!meetingId.trim()) {
+      alert("Enter Meeting ID");
+      return;
+    }
+
+    setMeetingTitle(meetingId);
+
+    navigate("/meeting-room", {
+      state: { meetingId },
+    });
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
 
         <h1 className="text-3xl font-bold mb-6 text-center">
@@ -23,12 +30,9 @@ function MeetingLobby() {
         </h1>
 
         <input
-          type="text"
-          value={meetingTitle}
-          onChange={(e) =>
-            setMeetingTitle(e.target.value)
-          }
-          placeholder="Meeting Title"
+          value={meetingId}
+          onChange={(e) => setMeetingId(e.target.value)}
+          placeholder="Enter Meeting ID"
           className="w-full border p-3 rounded-lg mb-4"
         />
 
@@ -40,7 +44,6 @@ function MeetingLobby() {
         </button>
 
       </div>
-
     </div>
   );
 }

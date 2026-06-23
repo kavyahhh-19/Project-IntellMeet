@@ -1,32 +1,33 @@
 import { create } from "zustand";
 
-interface User {
+type User = {
+  id: string;
   name: string;
   email: string;
-}
+};
 
-interface AuthState {
+type AuthStore = {
   user: User | null;
-  isLoggedIn: boolean;
-  login: (user: User) => void;
+  setUser: (user: User | null) => void;
+  loadUser: () => void;
   logout: () => void;
-}
+};
 
-const useAuthStore = create<AuthState>((set) => ({
+const useAuthStore = create<AuthStore>((set) => ({
   user: null,
-  isLoggedIn: false,
 
-  login: (user) =>
-    set({
-      user,
-      isLoggedIn: true,
-    }),
+  setUser: (user) => set({ user }),
 
-  logout: () =>
-    set({
-      user: null,
-      isLoggedIn: false,
-    }),
+  loadUser: () => {
+    const stored = localStorage.getItem("user");
+    if (stored) set({ user: JSON.parse(stored) });
+  },
+
+  logout: () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    set({ user: null });
+  },
 }));
 
 export default useAuthStore;

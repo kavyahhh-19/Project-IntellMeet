@@ -1,18 +1,13 @@
 import { create } from "zustand";
 
-interface MeetingState {
+type MeetingStore = {
   meetingTitle: string;
-
   setMeetingTitle: (title: string) => void;
-}
+};
 
-const useMeetingStore = create<MeetingState>((set) => ({
-  meetingTitle: "Project Discussion",
-
-  setMeetingTitle: (title) =>
-    set({
-      meetingTitle: title,
-    }),
+const useMeetingStore = create<MeetingStore>((set) => ({
+  meetingTitle: "",
+  setMeetingTitle: (title) => set({ meetingTitle: title }),
 }));
 
 export default useMeetingStore;

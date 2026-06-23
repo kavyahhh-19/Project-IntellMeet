@@ -1,90 +1,113 @@
-import Sidebar from "../components/common/Sidebar";
-
-import VideoGrid from "../components/meeting/VideoGrid";
-import MeetingControls from "../components/meeting/MeetingControls";
-import ParticipantsPanel from "../components/meeting/ParticipantsPanel";
-import ChatPanel from "../components/meeting/ChatPanel";
-import AICopilot from "../components/meeting/AICopilot";
-
-import useThemeStore from "../store/themeStore";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import socket from "../socket";
 
 function MeetingRoom() {
-  const darkMode = useThemeStore(
-    (state) => state.darkMode
-  );
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const meetingId = location.state?.meetingId;
+
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    if (!meetingId) {
+      navigate("/meeting-lobby");
+      return;
+    }
+
+    socket.emit("join-meeting", { meetingId });
+
+    socket.on("participants-updated", (data) => {
+      setParticipants(data.participants);
+    });
+
+    socket.on("new-message", (data) => {
+      setMessages((prev) => [...prev, data.message]);
+    });
+
+    return () => {
+      socket.emit("leave-meeting", { meetingId });
+    };
+  }, [meetingId]);
+
+  const sendMessage = () => {
+    if (!msg.trim()) return;
+
+    socket.emit("send-message", {
+      meetingId,
+      content: msg,
+    });
+
+    setMsg("");
+  };
 
   return (
-    <div
-      className={`flex min-h-screen ${
-        darkMode
-          ? "bg-slate-950 text-white"
-          : "bg-slate-100 text-black"
-      }`}
-    >
-      <Sidebar />
+    <div className="h-screen flex bg-gray-900 text-white">
 
-      <main className="flex-1 p-6 overflow-y-auto">
+      {/* LEFT - Participants */}
+      <div className="w-1/4 bg-gray-800 p-4">
+        <h2 className="text-lg font-bold mb-4">Participants</h2>
+
+        {participants.map((p, i) => (
+          <div key={i} className="p-2 bg-gray-700 rounded mb-2">
+            {p.name}
+          </div>
+        ))}
+      </div>
+
+      {/* CENTER - Meeting Area */}
+      <div className="flex-1 flex flex-col">
 
         {/* Header */}
+        <div className="p-3 border-b border-gray-700">
+          <h1 className="font-semibold">
+            Meeting Room: {meetingId}
+          </h1>
+        </div>
 
-        <div className="flex justify-between items-center mb-8">
+        {/* Video placeholder */}
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          🎥 Video Stream Area (WebRTC ready)
+        </div>
 
-          <div>
-            <h1 className="text-3xl font-bold">
-              Product Strategy Meeting
-            </h1>
+      </div>
 
-            <p className="text-gray-500 mt-1">
-              AI Powered Collaboration Session
-            </p>
-          </div>
+      {/* RIGHT - Chat */}
+      <div className="w-1/4 bg-gray-800 flex flex-col">
 
-          <div
-            className="
-            px-4
-            py-2
-            bg-red-500
-            text-white
-            rounded-full
-            font-medium
-            shadow-lg
-            animate-pulse
-            "
+        <div className="p-4 border-b border-gray-700">
+          Chat
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {messages.map((m, i) => (
+            <div key={i} className="bg-gray-700 p-2 rounded">
+              <b>{m.sender?.name || "User"}:</b> {m.content}
+            </div>
+          ))}
+        </div>
+
+        <div className="p-3 flex gap-2">
+          <input
+            value={msg}
+            onChange={(e) => setMsg(e.target.value)}
+            className="flex-1 p-2 rounded bg-gray-700"
+            placeholder="Type..."
+          />
+
+          <button
+            onClick={sendMessage}
+            className="bg-blue-600 px-3 rounded"
           >
-            Recording Live
-          </div>
-
+            Send
+          </button>
         </div>
 
-        {/* Main Layout */}
+      </div>
 
-        <div className="grid xl:grid-cols-4 gap-6">
-
-          {/* Left Side */}
-
-          <div className="xl:col-span-3">
-
-            <VideoGrid />
-
-            <MeetingControls />
-
-          </div>
-
-          {/* Right Side */}
-
-          <div className="space-y-6">
-
-            <AICopilot />
-
-            <ParticipantsPanel />
-
-            <ChatPanel />
-
-          </div>
-
-        </div>
-
-      </main>
     </div>
   );
 }
