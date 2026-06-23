@@ -4,6 +4,7 @@ const socket = io(import.meta.env.VITE_API_URL, {
   auth: {
     token: localStorage.getItem("token"),
   },
+  transports: ["websocket"],
 });
 
 export default socket;

@@ -1,16 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import socket from "../socket";
+import { createPeerConnection } from "../utils/webrtc";
+import useNotificationStore from "../store/notificationStore";
+
 
 function MeetingRoom() {
   const navigate = useNavigate();
   const location = useLocation();
+  const addNotification = useNotificationStore((s) => s.addNotification);
 
   const meetingId = location.state?.meetingId;
+  
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const peers = useRef<Record<string, RTCPeerConnection>>({});
 
-  const [participants, setParticipants] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [msg, setMsg] = useState("");
+  const [remoteStreams, setRemoteStreams] = useState<
+    Record<string, MediaStream>
+  >({});
 
   useEffect(() => {
     if (!meetingId) {
@@ -18,96 +25,205 @@ function MeetingRoom() {
       return;
     }
 
-    socket.emit("join-meeting", { meetingId });
+    let localStream: MediaStream;
 
-    socket.on("participants-updated", (data) => {
-      setParticipants(data.participants);
-    });
+    const init = async () => {
+      // 🎥 Get camera
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
 
-    socket.on("new-message", (data) => {
-      setMessages((prev) => [...prev, data.message]);
-    });
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStream;
+      }
+      
+      socket.on("participant-joined", ({ user }) => {
+        addNotification({
+          id: Date.now().toString(),
+          message: `${user.name} joined the meeting`,
+          type: "success",
+          time: Date.now(),
+        });
+      });
+
+      socket.on("participant-left", ({ name }) => {
+  addNotification({
+    id: Date.now().toString(),
+    message: `${name} left the meeting`,
+    type: "warning",
+    time: Date.now(),
+  });
+});
+
+socket.on("new-message", ({ message }) => {
+  addNotification({
+    id: Date.now().toString(),
+    message: `New message from ${message.sender?.name || "user"}`,
+    type: "info",
+    time: Date.now(),
+  });
+});
+
+socket.on("meeting-error", ({ message }) => {
+  addNotification({
+    id: Date.now().toString(),
+    message,
+    type: "warning",
+    time: Date.now(),
+  });
+});
+
+
+
+
+
+
+
+      // 🔌 Join meeting
+      socket.emit("join-meeting", { meetingId });
+
+      // 👤 New participant
+      socket.on("participant-joined", async ({ user }) => {
+        const peer = createPeerConnection(localStream);
+
+        peers.current[user.id] = peer;
+
+        peer.ontrack = (event) => {
+          setRemoteStreams((prev) => ({
+            ...prev,
+            [user.id]: event.streams[0],
+          }));
+        };
+
+        peer.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("webrtc-ice-candidate", {
+              meetingId,
+              targetUserId: user.id,
+              candidate: event.candidate,
+            });
+          }
+        };
+
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+
+        socket.emit("webrtc-offer", {
+          meetingId,
+          targetUserId: user.id,
+          offer,
+        });
+      });
+
+      // 📩 Receive offer
+      socket.on("webrtc-offer", async ({ fromUserId, offer }) => {
+        const peer = createPeerConnection(localStream);
+
+        peers.current[fromUserId] = peer;
+
+        await peer.setRemoteDescription(offer);
+
+        peer.ontrack = (event) => {
+          setRemoteStreams((prev) => ({
+            ...prev,
+            [fromUserId]: event.streams[0],
+          }));
+        };
+
+        peer.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("webrtc-ice-candidate", {
+              meetingId,
+              targetUserId: fromUserId,
+              candidate: event.candidate,
+            });
+          }
+        };
+
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+
+        socket.emit("webrtc-answer", {
+          meetingId,
+          targetUserId: fromUserId,
+          answer,
+        });
+      });
+
+      // 📩 Receive answer
+      socket.on("webrtc-answer", async ({ fromUserId, answer }) => {
+        const peer = peers.current[fromUserId];
+        if (peer) {
+          await peer.setRemoteDescription(answer);
+        }
+      });
+
+      // ❄ ICE candidates
+      socket.on("webrtc-ice-candidate", async ({ fromUserId, candidate }) => {
+        const peer = peers.current[fromUserId];
+        if (peer) {
+          await peer.addIceCandidate(candidate);
+        }
+      });
+    };
+
+    init();
 
     return () => {
-      socket.emit("leave-meeting", { meetingId });
+      socket.off("participant-joined");
+      socket.off("webrtc-offer");
+      socket.off("webrtc-answer");
+      socket.off("webrtc-ice-candidate");
+      
+      socket.off("participant-joined");
+      socket.off("participant-left");
+      socket.off("new-message");
+      socket.off("meeting-error");
+
     };
   }, [meetingId]);
 
-  const sendMessage = () => {
-    if (!msg.trim()) return;
-
-    socket.emit("send-message", {
-      meetingId,
-      content: msg,
-    });
-
-    setMsg("");
-  };
-
   return (
-    <div className="h-screen flex bg-gray-900 text-white">
+    <div className="h-screen bg-black text-white flex flex-col">
 
-      {/* LEFT - Participants */}
-      <div className="w-1/4 bg-gray-800 p-4">
-        <h2 className="text-lg font-bold mb-4">Participants</h2>
+      {/* Header */}
+      <div className="p-3 border-b border-gray-700 flex justify-between">
+        <h1>Meeting Room: {meetingId}</h1>
 
-        {participants.map((p, i) => (
-          <div key={i} className="p-2 bg-gray-700 rounded mb-2">
-            {p.name}
-          </div>
-        ))}
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="bg-red-600 px-4 py-2 rounded"
+        >
+          Leave
+        </button>
       </div>
 
-      {/* CENTER - Meeting Area */}
-      <div className="flex-1 flex flex-col">
+      {/* Video Grid */}
+      <div className="flex flex-wrap gap-4 p-4">
 
-        {/* Header */}
-        <div className="p-3 border-b border-gray-700">
-          <h1 className="font-semibold">
-            Meeting Room: {meetingId}
-          </h1>
-        </div>
+        {/* Local Video */}
+        <video
+          ref={localVideoRef}
+          autoPlay
+          muted
+          className="w-64 h-48 bg-gray-800 rounded"
+        />
 
-        {/* Video placeholder */}
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          🎥 Video Stream Area (WebRTC ready)
-        </div>
-
-      </div>
-
-      {/* RIGHT - Chat */}
-      <div className="w-1/4 bg-gray-800 flex flex-col">
-
-        <div className="p-4 border-b border-gray-700">
-          Chat
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {messages.map((m, i) => (
-            <div key={i} className="bg-gray-700 p-2 rounded">
-              <b>{m.sender?.name || "User"}:</b> {m.content}
-            </div>
-          ))}
-        </div>
-
-        <div className="p-3 flex gap-2">
-          <input
-            value={msg}
-            onChange={(e) => setMsg(e.target.value)}
-            className="flex-1 p-2 rounded bg-gray-700"
-            placeholder="Type..."
+        {/* Remote Videos */}
+        {Object.entries(remoteStreams).map(([id, stream]) => (
+          <video
+            key={id}
+            autoPlay
+            playsInline
+            ref={(video) => {
+              if (video) video.srcObject = stream;
+            }}
+            className="w-64 h-48 bg-gray-800 rounded"
           />
-
-          <button
-            onClick={sendMessage}
-            className="bg-blue-600 px-3 rounded"
-          >
-            Send
-          </button>
-        </div>
+        ))}
 
       </div>
-
     </div>
   );
 }

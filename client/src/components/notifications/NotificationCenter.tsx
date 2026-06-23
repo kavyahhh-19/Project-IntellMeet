@@ -1,37 +1,45 @@
+import useNotificationStore from "../../store/notificationStore";
+
 function NotificationCenter() {
-  const notifications = [
-    "Meeting summary generated",
-    "New participant joined",
-    "Task assigned to you",
-    "Meeting starts in 10 minutes",
-  ];
+  const notifications = useNotificationStore((s) => s.notifications);
+  const clear = useNotificationStore((s) => s.clear);
 
   return (
-    <div className="bg-white rounded-3xl shadow-xl p-6">
+    <div className="bg-white rounded-xl shadow-md p-4 h-full">
 
-      <h2 className="text-xl font-bold mb-5">
-        Notifications
-      </h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Notifications</h2>
 
-      <div className="space-y-3">
-
-        {notifications.map((item) => (
-          <div
-            key={item}
-            className="
-            p-4
-            rounded-xl
-            bg-slate-50
-            hover:bg-slate-100
-            transition
-            "
-          >
-            {item}
-          </div>
-        ))}
-
+        <button
+          onClick={clear}
+          className="text-sm text-red-500"
+        >
+          Clear
+        </button>
       </div>
 
+      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+
+        {notifications.length === 0 ? (
+          <p className="text-gray-400">No notifications yet</p>
+        ) : (
+          notifications.map((n) => (
+            <div
+              key={n.id}
+              className={`p-3 rounded-lg text-sm ${
+                n.type === "success"
+                  ? "bg-green-100"
+                  : n.type === "warning"
+                  ? "bg-red-100"
+                  : "bg-blue-100"
+              }`}
+            >
+              {n.message}
+            </div>
+          ))
+        )}
+
+      </div>
     </div>
   );
 }
