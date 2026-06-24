@@ -31,14 +31,12 @@ function Login() {
   try {
     setLoading(true);
 
-    const response = await loginUser(formData.email, formData.password);
+    const user = await loginUser(
+      formData.email,
+      formData.password
+    );
 
-    
-    localStorage.setItem("token", response.token);
-
-    
-    localStorage.setItem("user", JSON.stringify(response.user));
-    setUser(response.user);
+    setUser(user);
 
     alert("Login successful!");
 

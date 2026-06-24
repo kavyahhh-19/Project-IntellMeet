@@ -5,9 +5,9 @@ import Sidebar from "../components/common/Sidebar";
 function Profile() {
   const navigate = useNavigate();
 
-  const user = JSON.parse(
-    localStorage.getItem("user") || "{}"
-  );
+  const user =
+    useAuthStore((state) => state.user) ||
+    JSON.parse(localStorage.getItem("user") || "null");
 
   const logout = useAuthStore(
     (state) => state.logout
