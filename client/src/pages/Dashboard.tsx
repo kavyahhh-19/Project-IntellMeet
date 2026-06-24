@@ -29,7 +29,7 @@ function Dashboard() {
           </h1>
 
           <p className="text-gray-500 mb-8">
-            Welcome back, {user?.name || "Guest"}
+            Welcome back, {user?.name || "User"}
           </p>
 
           <PremiumStats />

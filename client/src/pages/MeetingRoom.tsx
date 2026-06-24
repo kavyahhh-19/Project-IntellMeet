@@ -19,6 +19,39 @@ function MeetingRoom() {
     Record<string, MediaStream>
   >({});
 
+  const [isMuted, setIsMuted] = useState(false);
+  const [cameraOff, setCameraOff] = useState(false);
+
+  const toggleMute = () => {
+    const stream = localVideoRef.current?.srcObject as MediaStream;
+
+    if (!stream) return;
+
+    stream.getAudioTracks().forEach(track => {
+      track.enabled = !track.enabled;
+    });
+
+    setIsMuted(!isMuted);
+  };
+
+  const toggleCamera = () => {
+    const stream = localVideoRef.current?.srcObject as MediaStream;
+
+    if (!stream) return;
+
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = !track.enabled;
+    });
+
+    setCameraOff(!cameraOff);
+  };
+
+
+  const copyMeetingId = async () => {
+    await navigator.clipboard.writeText(meetingId);
+    alert("Meeting ID copied!");
+  };
+
   useEffect(() => {
     if (!meetingId) {
       navigate("/meeting-lobby");
@@ -48,31 +81,31 @@ function MeetingRoom() {
       });
 
       socket.on("participant-left", ({ name }) => {
-  addNotification({
-    id: Date.now().toString(),
-    message: `${name} left the meeting`,
-    type: "warning",
-    time: Date.now(),
-  });
-});
+        addNotification({
+          id: Date.now().toString(),
+          message: `${name} left the meeting`,
+          type: "warning",
+          time: Date.now(),
+        });
+      });
 
-socket.on("new-message", ({ message }) => {
-  addNotification({
-    id: Date.now().toString(),
-    message: `New message from ${message.sender?.name || "user"}`,
-    type: "info",
-    time: Date.now(),
-  });
-});
+      socket.on("new-message", ({ message }) => {
+        addNotification({
+          id: Date.now().toString(),
+          message: `New message from ${message.sender?.name || "user"}`,
+          type: "info",
+          time: Date.now(),
+        });
+      });
 
-socket.on("meeting-error", ({ message }) => {
-  addNotification({
-    id: Date.now().toString(),
-    message,
-    type: "warning",
-    time: Date.now(),
-  });
-});
+      socket.on("meeting-error", ({ message }) => {
+        addNotification({
+          id: Date.now().toString(),
+          message,
+          type: "warning",
+          time: Date.now(),
+        });
+      });
 
 
 
@@ -188,15 +221,40 @@ socket.on("meeting-error", ({ message }) => {
     <div className="h-screen bg-black text-white flex flex-col">
 
       {/* Header */}
-      <div className="p-3 border-b border-gray-700 flex justify-between">
+      <div className="p-3 border-b border-gray-700 flex justify-between items-center">
         <h1>Meeting Room: {meetingId}</h1>
 
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="bg-red-600 px-4 py-2 rounded"
-        >
-          Leave
-        </button>
+        <div className="flex gap-3">
+
+          <button
+            onClick={copyMeetingId}
+            className="w-80 h-60 bg-gray-800 rounded-xl object-cover border border-gray-700"
+          >
+            📋 Copy ID
+          </button>
+
+          <button
+            onClick={toggleMute}
+            className="w-80 h-60 bg-gray-800 rounded-xl object-cover border border-gray-700"
+          >
+            {isMuted ? "🎤 Unmute" : "🎤 Mute"}
+          </button>
+
+          <button
+            onClick={toggleCamera}
+            className="w-80 h-60 bg-gray-800 rounded-xl object-cover border border-gray-700"
+          >
+            {cameraOff ? "📷 Start Video" : "📷 Stop Video"}
+          </button>
+
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="w-80 h-60 bg-red-600 rounded-xl object-cover border border-gray-700"
+          >
+            Leave
+          </button>
+
+        </div>
       </div>
 
       {/* Video Grid */}
@@ -207,7 +265,7 @@ socket.on("meeting-error", ({ message }) => {
           ref={localVideoRef}
           autoPlay
           muted
-          className="w-64 h-48 bg-gray-800 rounded"
+          className="w-80 h-60 bg-gray-800 rounded-xl object-cover border border-gray-700"
         />
 
         {/* Remote Videos */}
@@ -219,7 +277,7 @@ socket.on("meeting-error", ({ message }) => {
             ref={(video) => {
               if (video) video.srcObject = stream;
             }}
-            className="w-64 h-48 bg-gray-800 rounded"
+            className="w-80 h-60 bg-gray-800 rounded-xl object-cover border border-gray-700"
           />
         ))}
 
